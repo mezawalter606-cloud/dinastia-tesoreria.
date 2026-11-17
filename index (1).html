@@ -1,0 +1,1410 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WMZ Enterprise | Control de Compras, Recibo & Auditoría - Supermercados Dinastía</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; color: #0f172a; }
+        
+        /* MOTOR DE IMPRESIÓN DE INFORMES EJECUTIVOS PDF / A4 */
+        @media print {
+            body * {
+                visibility: hidden !important;
+            }
+            #printArea, #printArea * {
+                visibility: visible !important;
+            }
+            #printArea {
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 15mm !important;
+                background: #ffffff !important;
+                color: #000000 !important;
+            }
+            @page {
+                size: A4 portrait;
+                margin: 10mm;
+            }
+        }
+        
+        .print-only { display: none; }
+        @media print { .print-only { display: block !important; } }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased min-h-screen pb-16">
+
+    <!-- HEADER EJECUTIVO BLANCO Y ROJO -->
+    <header class="bg-white border-b-2 border-red-600 shadow-md sticky top-0 z-40 no-print">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center space-x-3.5">
+                <div class="bg-red-600 text-white font-black px-4 py-2 rounded-xl text-xl tracking-wider shadow-md border border-red-700">WMZ</div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-base font-black tracking-wide text-slate-900">SUPERMERCADOS DINASTÍA</h1>
+                        <span class="bg-red-50 text-red-700 border border-red-200 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider">Enterprise Pro v5.1</span>
+                    </div>
+                    <p class="text-xs text-slate-500 font-semibold">Sistema Corporativo de Compras, Programación de Citas, Recibo & Auditoría</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-4">
+                <div class="text-right hidden sm:block">
+                    <p class="text-xs text-slate-500 font-medium">Jefatura de Seguridad: <span class="text-red-700 font-extrabold">Walter Meza Trujillano</span></p>
+                    <div id="liveClock" class="text-xs font-mono text-slate-800 font-bold tracking-wide"></div>
+                </div>
+                <div class="flex space-x-2">
+                    <button onclick="exportarBackupJSON()" title="Descargar Respaldo" class="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition shadow-sm">
+                        <i class="fa-solid fa-cloud-arrow-down text-red-600"></i> <span class="hidden md:inline">Respaldar</span>
+                    </button>
+                    <label title="Restaurar Respaldo" class="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 px-3 py-2 rounded-lg text-xs font-bold cursor-pointer flex items-center gap-2 transition shadow-sm">
+                        <i class="fa-solid fa-cloud-arrow-up text-red-600"></i> <span class="hidden md:inline">Cargar</span>
+                        <input type="file" id="importFileInput" onchange="importarBackupJSON(event)" class="hidden" accept=".json">
+                    </label>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-7xl mx-auto px-4 mt-6 space-y-6 no-print">
+
+        <!-- TABLERO PRINCIPAL DE INDICADORES EN TIEMPO REAL -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white p-4 rounded-xl border-l-4 border-red-600 shadow-sm border-t border-r border-b border-slate-200">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Recibido Hoy (Volumen)</p>
+                        <h4 id="cardVolumenHoy" class="text-lg font-black text-slate-900 mt-1">0 Ton | 0 Cajas</h4>
+                    </div>
+                    <div class="bg-red-50 text-red-600 p-2.5 rounded-xl border border-red-100"><i class="fa-solid fa-truck-ramp-box text-lg"></i></div>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-2 font-medium" id="cardCargaDetalleHoy">0 @ | 0 Bultos recibidos hoy</p>
+            </div>
+
+            <div class="bg-white p-4 rounded-xl border-l-4 border-emerald-600 shadow-sm border-t border-r border-b border-slate-200">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Recaudo Proveedores</p>
+                        <h4 id="cardRecaudado" class="text-xl font-black text-emerald-700 mt-1">$0</h4>
+                    </div>
+                    <div class="bg-emerald-50 text-emerald-600 p-2.5 rounded-xl border border-emerald-100"><i class="fa-solid fa-hand-holding-dollar text-lg"></i></div>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-2 font-medium">Cobrado por descargue en el período</p>
+            </div>
+
+            <div class="bg-white p-4 rounded-xl border-l-4 border-slate-800 shadow-sm border-t border-r border-b border-slate-200">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Pagado a Descargadores</p>
+                        <h4 id="cardPagadoCoteros" class="text-xl font-black text-slate-900 mt-1">$0</h4>
+                    </div>
+                    <div class="bg-slate-100 text-slate-800 p-2.5 rounded-xl border border-slate-200"><i class="fa-solid fa-users text-lg"></i></div>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-2 font-medium">Pago a coteros en el período</p>
+            </div>
+
+            <div class="bg-white p-4 rounded-xl border-l-4 border-blue-600 shadow-sm border-t border-r border-b border-slate-200">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Utilidad Neta Recibo</p>
+                        <h4 id="cardUtilidad" class="text-xl font-black text-blue-700 mt-1">$0</h4>
+                    </div>
+                    <div class="bg-blue-50 text-blue-600 p-2.5 rounded-xl border border-blue-100"><i class="fa-solid fa-vault text-lg"></i></div>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-2 font-medium">Balance neto de operación</p>
+            </div>
+        </section>
+
+        <!-- FILTROS DE PERÍODO TEMPORAL -->
+        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-wrap justify-between items-center gap-3">
+            <div class="flex items-center space-x-2">
+                <span class="text-xs font-extrabold text-slate-700 uppercase tracking-wider"><i class="fa-solid fa-filter text-red-600 mr-1"></i> Período de Auditoría:</span>
+            </div>
+            <div class="flex flex-wrap gap-1.5">
+                <button onclick="setFiltroPeriodo('diario')" id="btnFiltro-diario" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">Diario</button>
+                <button onclick="setFiltroPeriodo('semanal')" id="btnFiltro-semanal" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">Semanal</button>
+                <button onclick="setFiltroPeriodo('quincenal')" id="btnFiltro-quincenal" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">Quincenal</button>
+                <button onclick="setFiltroPeriodo('mensual')" id="btnFiltro-mensual" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">Mensual</button>
+                <button onclick="setFiltroPeriodo('todos')" id="btnFiltro-todos" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-extrabold bg-red-600 text-white transition shadow-sm">Todos</button>
+            </div>
+        </div>
+
+        <!-- MÓDULO 1: ÁREA DE COMPRAS - PROGRAMACIÓN Y CITA DE PROVEEDORES -->
+        <section class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="bg-slate-900 text-white px-6 py-4 border-b border-slate-800 flex flex-wrap justify-between items-center gap-4">
+                <div class="flex items-center space-x-3">
+                    <div class="p-2 bg-red-600 rounded-lg text-white font-bold">
+                        <i class="fa-solid fa-cart-shopping text-lg"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-sm font-black tracking-wide uppercase">MÓDULO ÁREA DE COMPRAS — PROGRAMACIÓN DE ENTREGAS</h2>
+                        <p class="text-xs text-slate-300">Planificación diaria de proveedores asignados para recibo de mercancía</p>
+                    </div>
+                </div>
+                <span class="text-xs bg-red-500/20 text-red-300 border border-red-500/30 px-3 py-1 rounded-full font-bold">
+                    <i class="fa-solid fa-clock text-[9px] mr-1"></i> Control de Agenda
+                </span>
+            </div>
+
+            <div class="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- FORMULARIO DE PROGRAMACIÓN -->
+                <div class="lg:col-span-4 bg-slate-50 p-5 rounded-xl border border-slate-200">
+                    <h3 class="text-xs font-black text-slate-800 uppercase tracking-wider mb-3 flex items-center justify-between">
+                        <span id="tituloFormProgramacion"><i class="fa-solid fa-calendar-plus text-red-600 mr-1.5"></i> Programar Entrega</span>
+                        <button type="button" onclick="cancelarEdicionProgramacion()" id="btnCancelarProg" class="hidden text-xs text-red-600 hover:underline font-normal">Cancelar</button>
+                    </h3>
+                    <form id="formProgramacion" onsubmit="guardarProgramacion(event)" class="space-y-3">
+                        <input type="hidden" id="progIdEdit">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Empresa Proveedora *</label>
+                            <input type="text" id="progProveedor" required placeholder="Ej: Bavaria, Alpina, Nestlé..." class="w-full text-sm bg-white text-slate-900 border-slate-300 rounded-lg p-2.5 border focus:ring-2 focus:ring-red-600 focus:outline-none">
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">Vendedor / Asesor</label>
+                                <input type="text" id="progVendedor" placeholder="Nombre contacto" class="w-full text-sm bg-white text-slate-900 border-slate-300 rounded-lg p-2.5 border focus:ring-2 focus:ring-red-600 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">Fecha Entrega *</label>
+                                <input type="date" id="progFecha" required class="w-full text-sm bg-white text-slate-900 border-slate-300 rounded-lg p-2.5 border focus:ring-2 focus:ring-red-600 focus:outline-none">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">Hora Límite Pactada</label>
+                                <input type="time" id="progHora" class="w-full text-sm bg-white text-slate-900 border-slate-300 rounded-lg p-2.5 border focus:ring-2 focus:ring-red-600 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">Turno Estimado</label>
+                                <input type="text" id="progTurno" placeholder="Ej: Mañana" class="w-full text-sm bg-white text-slate-900 border-slate-300 rounded-lg p-2.5 border focus:ring-2 focus:ring-red-600 focus:outline-none">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Observaciones / Pedido</label>
+                            <input type="text" id="progObs" placeholder="Ej: Orden de Compra #1234" class="w-full text-sm bg-white text-slate-900 border-slate-300 rounded-lg p-2.5 border focus:ring-2 focus:ring-red-600 focus:outline-none">
+                        </div>
+                        <button type="submit" id="btnGuardarProg" class="w-full bg-red-600 hover:bg-red-700 text-white font-extrabold py-2.5 px-4 rounded-lg text-xs tracking-wide transition flex items-center justify-center gap-2 shadow-md">
+                            <i class="fa-solid fa-floppy-disk"></i> Registrar Programación
+                        </button>
+                    </form>
+                </div>
+
+                <!-- AGENDA DE PROVEEDORES PROGRAMADOS CON ESTADO EN TIEMPO REAL -->
+                <div class="lg:col-span-8 bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-3">
+                    <div class="flex flex-wrap justify-between items-center gap-2">
+                        <div class="flex items-center space-x-2">
+                            <h3 class="text-xs font-black text-slate-800 uppercase tracking-wider">Agenda Diaria de Entregas</h3>
+                            <span class="text-xs bg-red-100 text-red-800 border border-red-200 px-2.5 py-0.5 rounded-full font-bold" id="countAgendaText">0 Citas</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-slate-400"><i class="fa-solid fa-magnifying-glass text-[10px]"></i></span>
+                                <input type="text" id="searchAgenda" oninput="renderAgendaCompras()" placeholder="Buscar proveedor..." class="text-xs bg-white text-slate-900 border border-slate-300 rounded-lg pl-7 pr-3 py-1.5 w-44 focus:outline-none focus:ring-1 focus:ring-red-600">
+                            </div>
+                            <button type="button" onclick="imprimirInformeAgendaComprasPDF()" class="bg-slate-900 hover:bg-slate-800 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 shadow">
+                                <i class="fa-solid fa-file-pdf text-red-400"></i> Informe PDF
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="max-h-60 overflow-y-auto border border-slate-200 rounded-lg bg-white">
+                        <table class="w-full text-xs text-left">
+                            <thead class="bg-slate-100 text-slate-700 sticky top-0 text-[10px] font-bold border-b border-slate-200">
+                                <tr>
+                                    <th class="p-2.5">Fecha & Hora</th>
+                                    <th class="p-2.5">Proveedor</th>
+                                    <th class="p-2.5">Vendedor</th>
+                                    <th class="p-2.5">Detalle / Orden</th>
+                                    <th class="p-2.5 text-center">Estado Agenda</th>
+                                    <th class="p-2.5 text-center">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tablaAgendaCompras" class="divide-y divide-slate-100">
+                                <!-- Dinámico -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- MÓDULO 2: RECIBO DE MERCANCÍA & REGISTRO DE FACTURAS -->
+        <section class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="bg-slate-900 text-white px-6 py-4 border-b border-slate-800 flex justify-between items-center">
+                <h2 class="text-sm font-black tracking-wide uppercase flex items-center gap-2" id="tituloFormFactura">
+                    <i class="fa-solid fa-truck-ramp-box text-red-500"></i> Registro de Entrada de Mercancía & Factura
+                </h2>
+                <button type="button" onclick="cancelarEdicionFactura()" id="btnCancelarFactura" class="hidden text-xs bg-red-600 hover:bg-red-700 text-white font-bold px-3 py-1 rounded transition">
+                    Cancelar Edición
+                </button>
+            </div>
+
+            <form id="formFactura" onsubmit="guardarFactura(event)" class="p-6 space-y-6">
+                <input type="hidden" id="facturaIdEdit">
+
+                <!-- DATOS GENERALES -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Número de Factura *</label>
+                        <input type="text" id="numFactura" required placeholder="FAC-0000" class="w-full text-sm bg-white text-slate-900 border-slate-300 rounded-lg p-2.5 border focus:ring-2 focus:ring-red-600 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Empresa Proveedora *</label>
+                        <input type="text" id="empresaProveedor" required placeholder="Nombre proveedor" class="w-full text-sm bg-white text-slate-900 border-slate-300 rounded-lg p-2.5 border focus:ring-2 focus:ring-red-600 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Fecha de Recibo *</label>
+                        <input type="date" id="fechaFactura" required class="w-full text-sm bg-white text-slate-900 border-slate-300 rounded-lg p-2.5 border focus:ring-2 focus:ring-red-600 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Turno / Horario *</label>
+                        <input type="text" id="turnoFactura" required placeholder="Ej: Mañana (06:00 AM - 02:00 PM)" list="turnosSugeridos" class="w-full text-sm bg-white text-slate-900 border-slate-300 rounded-lg p-2.5 border focus:ring-2 focus:ring-red-600 focus:outline-none">
+                        <datalist id="turnosSugeridos">
+                            <option value="Mañana (06:00 AM - 02:00 PM)">
+                            <option value="Tarde (02:00 PM - 10:00 PM)">
+                            <option value="Noche (10:00 PM - 06:00 AM)">
+                        </datalist>
+                    </div>
+                </div>
+
+                <!-- CONTROL DE TIEMPOS -->
+                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Hora Llegada</label>
+                        <input type="time" id="horaLlegada" class="w-full text-sm bg-white text-slate-900 border-slate-300 rounded-lg p-2.5 border">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Hora Inicio Recibo</label>
+                        <input type="time" id="horaInicio" class="w-full text-sm bg-white text-slate-900 border-slate-300 rounded-lg p-2.5 border">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Hora Término Recibo</label>
+                        <input type="time" id="horaTermino" class="w-full text-sm bg-white text-slate-900 border-slate-300 rounded-lg p-2.5 border">
+                    </div>
+                </div>
+
+                <!-- DESGLOSE DE UNIDADES -->
+                <div>
+                    <h3 class="text-xs font-black text-slate-700 uppercase tracking-wider mb-2">Desglose de Mercancía Descargada & Tarifas</h3>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                            <label class="block text-xs font-bold text-slate-800 mb-1">Toneladas</label>
+                            <div class="space-y-1.5">
+                                <input type="text" id="cantTon" value="0" oninput="calcularTotalDescargueForm()" placeholder="Cant." class="w-full text-xs bg-white text-slate-900 border-slate-300 rounded p-2 border">
+                                <input type="text" id="tarifaTon" value="15000" oninput="calcularTotalDescargueForm()" placeholder="Tarifa $" class="w-full text-xs bg-white text-red-700 font-bold border-slate-300 rounded p-2 border">
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                            <label class="block text-xs font-bold text-slate-800 mb-1">Cajas</label>
+                            <div class="space-y-1.5">
+                                <input type="text" id="cantCajas" value="0" oninput="calcularTotalDescargueForm()" placeholder="Cant." class="w-full text-xs bg-white text-slate-900 border-slate-300 rounded p-2 border">
+                                <input type="text" id="tarifaCajas" value="400" oninput="calcularTotalDescargueForm()" placeholder="Tarifa $" class="w-full text-xs bg-white text-red-700 font-bold border-slate-300 rounded p-2 border">
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                            <label class="block text-xs font-bold text-slate-800 mb-1">Arrobas (@)</label>
+                            <div class="space-y-1.5">
+                                <input type="text" id="cantArrobas" value="0" oninput="calcularTotalDescargueForm()" placeholder="Cant." class="w-full text-xs bg-white text-slate-900 border-slate-300 rounded p-2 border">
+                                <input type="text" id="tarifaArrobas" value="300" oninput="calcularTotalDescargueForm()" placeholder="Tarifa $" class="w-full text-xs bg-white text-red-700 font-bold border-slate-300 rounded p-2 border">
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                            <label class="block text-xs font-bold text-slate-800 mb-1">Bultos</label>
+                            <div class="space-y-1.5">
+                                <input type="text" id="cantBultos" value="0" oninput="calcularTotalDescargueForm()" placeholder="Cant." class="w-full text-xs bg-white text-slate-900 border-slate-300 rounded p-2 border">
+                                <input type="text" id="tarifaBultos" value="500" oninput="calcularTotalDescargueForm()" placeholder="Tarifa $" class="w-full text-xs bg-white text-red-700 font-bold border-slate-300 rounded p-2 border">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap justify-between items-center bg-slate-900 text-white p-4 rounded-xl">
+                    <div>
+                        <span class="text-xs text-slate-300 block font-medium">Valor Total Descargue Proveedor:</span>
+                        <span id="txtTotalDescargueForm" class="text-2xl font-black text-red-500">$0</span>
+                    </div>
+                    <button type="submit" id="btnSubmitFactura" class="bg-red-600 hover:bg-red-700 text-white font-black py-3 px-6 rounded-xl text-xs tracking-wider transition shadow-lg flex items-center gap-2">
+                        <i class="fa-solid fa-floppy-disk"></i> Guardar Factura & Confirmar Recibo
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <!-- MÓDULO 3: HISTORIAL & AUDITORÍA PROVEEDOR POR PROVEEDOR -->
+        <section class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="p-4 border-b border-slate-200 flex flex-wrap justify-between items-center gap-4 bg-slate-50">
+                <div class="flex flex-wrap items-center gap-3">
+                    <h3 class="font-black text-slate-900 text-xs uppercase tracking-wider">Histórico de Facturas & Seguimiento por Proveedor</h3>
+                    <span class="text-xs bg-red-100 text-red-800 font-black border border-red-200 px-3 py-1 rounded-full" id="totalRecaudadoProveedorText">Total: $0</span>
+                </div>
+                
+                <div class="flex flex-wrap items-center gap-2">
+                    <select id="filtroProveedorIndividual" onchange="renderFacturas()" class="text-xs bg-white text-slate-900 font-bold border border-slate-300 rounded-lg px-3 py-2 focus:outline-none">
+                        <option value="todos">-- Todos los Proveedores --</option>
+                    </select>
+
+                    <button type="button" onclick="imprimirInformeEjecutivoProveedorPDF()" title="Imprimir Informe Ejecutivo en PDF" class="bg-slate-900 hover:bg-slate-800 text-white text-xs px-3.5 py-2 rounded-lg font-bold transition flex items-center gap-1.5 shadow">
+                        <i class="fa-solid fa-file-pdf text-red-500"></i> Informe PDF Proveedor
+                    </button>
+
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400"><i class="fa-solid fa-magnifying-glass"></i></span>
+                        <input type="text" id="searchFacturas" oninput="renderFacturas()" placeholder="Buscar factura..." class="text-xs bg-white text-slate-900 border border-slate-300 rounded-lg pl-8 pr-3 py-2 w-48 focus:outline-none focus:ring-1 focus:ring-red-600">
+                    </div>
+
+                    <button onclick="exportarExcelCSV()" class="bg-emerald-700 hover:bg-emerald-800 text-white text-xs px-3.5 py-2 rounded-lg font-bold transition flex items-center gap-2 shadow-sm">
+                        <i class="fa-solid fa-file-excel"></i> CSV
+                    </button>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-xs text-left">
+                    <thead class="bg-slate-100 text-slate-700 uppercase text-[10px] font-bold border-b border-slate-200">
+                        <tr>
+                            <th class="p-3.5">Factura</th>
+                            <th class="p-3.5">Proveedor</th>
+                            <th class="p-3.5">Fecha & Turno</th>
+                            <th class="p-3.5">Tiempos</th>
+                            <th class="p-3.5">Carga Descargada</th>
+                            <th class="p-3.5 text-right">Valor Descargue</th>
+                            <th class="p-3.5 text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaBodyFacturas" class="divide-y divide-slate-100">
+                        <!-- Dinámico -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="p-4 border-t border-slate-200 flex justify-between items-center text-xs text-slate-500">
+                <span id="infoPaginacion">Página 1</span>
+                <div class="flex space-x-2">
+                    <button onclick="cambiarPagina(-1)" id="btnPagPrev" class="px-3.5 py-1.5 bg-white border border-slate-300 rounded-lg hover:bg-slate-100 font-bold transition">Anterior</button>
+                    <button onclick="cambiarPagina(1)" id="btnPagNext" class="px-3.5 py-1.5 bg-white border border-slate-300 rounded-lg hover:bg-slate-100 font-bold transition">Siguiente</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- MÓDULO 4: DESCARGADORES (COTEROS) -->
+        <section class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="bg-slate-900 text-white px-6 py-4 border-b border-slate-800 flex justify-between items-center">
+                <h2 class="text-sm font-black tracking-wide uppercase flex items-center gap-2">
+                    <i class="fa-solid fa-users text-red-500"></i> Módulo Operativo de Descargadores (Coteros)
+                </h2>
+            </div>
+
+            <div class="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- FORMULARIO REGISTRO COTERO -->
+                <div class="lg:col-span-4 bg-slate-50 p-5 rounded-xl border border-slate-200">
+                    <h3 class="text-xs font-black text-slate-800 uppercase tracking-wider mb-3 flex items-center justify-between">
+                        <span id="tituloFormCotero"><i class="fa-solid fa-user-plus text-red-600 mr-1.5"></i> Registrar Descargador</span>
+                        <button type="button" onclick="cancelarEdicionCotero()" id="btnCancelarCotero" class="hidden text-xs text-red-600 hover:underline">Cancelar</button>
+                    </h3>
+                    <form id="formCotero" onsubmit="guardarDescargador(event)" class="space-y-3">
+                        <input type="hidden" id="coteroIdEdit">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Nombre Completo *</label>
+                            <input type="text" id="coteroNombre" required placeholder="Ej: Carlos Gómez" class="w-full text-sm bg-white text-slate-900 border-slate-300 rounded-lg p-2.5 border focus:ring-2 focus:ring-red-600 focus:outline-none">
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">Cédula</label>
+                                <input type="text" id="coteroCedula" placeholder="Documento" class="w-full text-sm bg-white text-slate-900 border-slate-300 rounded-lg p-2.5 border focus:ring-2 focus:ring-red-600 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">Teléfono</label>
+                                <input type="text" id="coteroTelefono" placeholder="Contacto" class="w-full text-sm bg-white text-slate-900 border-slate-300 rounded-lg p-2.5 border focus:ring-2 focus:ring-red-600 focus:outline-none">
+                            </div>
+                        </div>
+                        <button type="submit" id="btnGuardarCotero" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-extrabold py-2.5 px-4 rounded-lg text-xs tracking-wide transition shadow-md">
+                            <i class="fa-solid fa-floppy-disk"></i> Registrar Personal
+                        </button>
+                    </form>
+
+                    <div class="mt-4 border-t border-slate-200 pt-3">
+                        <div class="relative mb-2">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-slate-400"><i class="fa-solid fa-magnifying-glass text-[10px]"></i></span>
+                            <input type="text" id="searchCoterosList" oninput="renderCoteros()" placeholder="Buscar descargador..." class="w-full text-[11px] bg-white text-slate-900 border border-slate-300 rounded-lg pl-7 pr-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-red-600">
+                        </div>
+                        <div class="max-h-36 overflow-y-auto border border-slate-200 rounded-lg bg-white">
+                            <table class="w-full text-xs text-left">
+                                <thead class="bg-slate-100 text-slate-600 sticky top-0 text-[10px]">
+                                    <tr><th class="p-2">Nombre</th><th class="p-2">Cédula</th><th class="p-2 text-right">Acción</th></tr>
+                                </thead>
+                                <tbody id="tablaListaCoteros" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PAGO A COTEROS Y REPORTE -->
+                <div class="lg:col-span-8 bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-4">
+                    <h3 class="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-money-check-dollar text-red-600"></i> Liquidación de Pago a Coteros
+                    </h3>
+
+                    <form id="formPagoCotero" onsubmit="procesarPagoCotero(event)" class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Colaborador *</label>
+                            <select id="selectPagoCotero" required class="w-full text-sm bg-white text-slate-900 border-slate-300 rounded-lg p-2.5 border focus:ring-2 focus:ring-red-600 focus:outline-none">
+                                <option value="">-- Seleccionar --</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Monto ($) *</label>
+                            <input type="text" id="montoPagoCotero" required placeholder="Ej: 200000" class="w-full text-sm bg-white text-red-700 font-bold border-slate-300 rounded-lg p-2.5 border focus:ring-2 focus:ring-red-600 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Fecha</label>
+                            <input type="date" id="fechaPagoCotero" required class="w-full text-sm bg-white text-slate-900 border-slate-300 rounded-lg p-2.5 border">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Concepto</label>
+                            <input type="text" id="conceptoPagoCotero" placeholder="Ej: Pago jornada de descargue" class="w-full text-sm bg-white text-slate-900 border-slate-300 rounded-lg p-2.5 border">
+                        </div>
+                        <div class="flex items-end">
+                            <button type="submit" class="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-2.5 px-4 rounded-lg text-xs tracking-wide transition shadow-md flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-print"></i> Pagar e Imprimir Recibo
+                            </button>
+                        </div>
+                    </form>
+
+                    <div class="border-t border-slate-200 pt-4 space-y-3">
+                        <div class="flex flex-wrap justify-between items-center gap-2">
+                            <div class="flex items-center space-x-2">
+                                <h4 class="text-[11px] font-black text-slate-800 uppercase tracking-wider">Historial de Pagos Coteros</h4>
+                                <span class="text-xs text-red-700 font-black" id="totalPagadoCoterosText">Total: $0</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <select id="filtroCoteroIndividual" onchange="renderPagosCoteros()" class="text-xs bg-white text-slate-900 border border-slate-300 rounded-lg px-2.5 py-1.5 font-bold">
+                                    <option value="todos">-- Todos los Coteros --</option>
+                                </select>
+                                <button type="button" onclick="imprimirInformeEjecutivoCoteroPDF()" class="bg-slate-900 hover:bg-slate-800 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 shadow">
+                                    <i class="fa-solid fa-file-pdf text-red-500"></i> Informe PDF Cotero
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="max-h-48 overflow-y-auto border border-slate-200 rounded-lg bg-white">
+                            <table class="w-full text-xs text-left">
+                                <thead class="bg-slate-100 text-slate-600 sticky top-0 text-[10px]">
+                                    <tr><th class="p-2">Fecha</th><th class="p-2">Colaborador</th><th class="p-2">Concepto</th><th class="p-2 text-right">Valor</th><th class="p-2 text-center">Acción</th></tr>
+                                </thead>
+                                <tbody id="tablaHistorialPagosCoteros" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <footer class="text-center text-xs text-slate-500 py-6 border-t border-slate-200">
+            <p><span class="font-bold text-slate-700">WMZ Enterprise Logistics Solution</span> &copy; 2026 | Arquitectura y Desarrollo: <span class="font-bold text-slate-900">Walter Meza Trujillano</span> para <span class="font-bold text-red-700">Supermercados Dinastía</span></p>
+        </footer>
+    </div>
+
+    <!-- CONTENEDOR DE IMPRESIÓN PDF / A4 EJECUTIVA -->
+    <div id="printArea" class="print-only"></div>
+
+    <script>
+        let DB = {
+            coteros: JSON.parse(localStorage.getItem('wmz_enterprise_coteros')) || [
+                { id: '1', nombre: 'Carlos Mario López', cedula: '1118234567', telefono: '3101234567' }
+            ],
+            pagosCoteros: JSON.parse(localStorage.getItem('wmz_enterprise_pagos')) || [],
+            facturas: JSON.parse(localStorage.getItem('wmz_enterprise_facturas')) || [],
+            programacionCompras: JSON.parse(localStorage.getItem('wmz_enterprise_compras')) || []
+        };
+
+        let estadoFiltroPeriodo = 'todos';
+        let paginaActual = 1;
+        const registrosPorPagina = 10;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            iniciarReloj();
+            setFechaActualInputs();
+            calcularTotalDescargueForm();
+            renderTodo();
+        });
+
+        function saveLocal() {
+            localStorage.setItem('wmz_enterprise_coteros', JSON.stringify(DB.coteros));
+            localStorage.setItem('wmz_enterprise_pagos', JSON.stringify(DB.pagosCoteros));
+            localStorage.setItem('wmz_enterprise_facturas', JSON.stringify(DB.facturas));
+            localStorage.setItem('wmz_enterprise_compras', JSON.stringify(DB.programacionCompras));
+        }
+
+        function renderTodo() {
+            renderCoteros();
+            renderPagosCoteros();
+            renderAgendaCompras();
+            renderIndicadores();
+            renderFacturas();
+            saveLocal();
+        }
+
+        function iniciarReloj() {
+            const clockEl = document.getElementById('liveClock');
+            if (clockEl) {
+                setInterval(() => {
+                    const now = new Date();
+                    clockEl.textContent = now.toLocaleDateString('es-CO') + ' ' + now.toLocaleTimeString('es-CO');
+                }, 1000);
+            }
+        }
+
+        function setFechaActualInputs() {
+            const hoy = new Date().toISOString().split('T')[0];
+            const elFechaFac = document.getElementById('fechaFactura');
+            const elFechaPag = document.getElementById('fechaPagoCotero');
+            const elFechaProg = document.getElementById('progFecha');
+            if (elFechaFac && !elFechaFac.value) elFechaFac.value = hoy;
+            if (elFechaPag && !elFechaPag.value) elFechaPag.value = hoy;
+            if (elFechaProg && !elFechaProg.value) elFechaProg.value = hoy;
+            
+            const now = new Date();
+            const hrs = String(now.getHours()).padStart(2, '0');
+            const mins = String(now.getMinutes()).padStart(2, '0');
+            const elLlegada = document.getElementById('horaLlegada');
+            const elInicio = document.getElementById('horaInicio');
+            const elProgHora = document.getElementById('progHora');
+            if (elLlegada && !elLlegada.value) elLlegada.value = `${hrs}:${mins}`;
+            if (elInicio && !elInicio.value) elInicio.value = `${hrs}:${mins}`;
+            if (elProgHora && !elProgHora.value) elProgHora.value = `${hrs}:${mins}`;
+        }
+
+        function limpiarNumero(val) {
+            if (!val) return 0;
+            const limpio = val.toString().replace(/[^0-9.,]/g, '').replace(',', '.');
+            const num = parseFloat(limpio);
+            return isNaN(num) ? 0 : num;
+        }
+
+        // --- PROGRAMACIÓN COMPRAS ---
+        function guardarProgramacion(e) {
+            e.preventDefault();
+            const idEdit = document.getElementById('progIdEdit').value;
+            const proveedor = document.getElementById('progProveedor').value.trim();
+            const vendedor = document.getElementById('progVendedor').value.trim();
+            const fecha = document.getElementById('progFecha').value;
+            const hora = document.getElementById('progHora').value;
+            const turno = document.getElementById('progTurno').value.trim();
+            const obs = document.getElementById('progObs').value.trim();
+
+            if (!proveedor || !fecha) return;
+
+            const itemProg = { id: idEdit || Date.now().toString(), proveedor, vendedor, fecha, hora, turno, obs };
+
+            if (idEdit) {
+                const idx = DB.programacionCompras.findIndex(p => p.id === idEdit);
+                if (idx !== -1) DB.programacionCompras[idx] = itemProg;
+            } else {
+                DB.programacionCompras.unshift(itemProg);
+            }
+
+            cancelarEdicionProgramacion();
+            renderTodo();
+        }
+
+        function editarProgramacion(id) {
+            const item = DB.programacionCompras.find(p => p.id === id);
+            if (!item) return;
+            document.getElementById('progIdEdit').value = item.id;
+            document.getElementById('progProveedor').value = item.proveedor;
+            document.getElementById('progVendedor').value = item.vendedor || '';
+            document.getElementById('progFecha').value = item.fecha;
+            document.getElementById('progHora').value = item.hora || '';
+            document.getElementById('progTurno').value = item.turno || '';
+            document.getElementById('progObs').value = item.obs || '';
+
+            document.getElementById('tituloFormProgramacion').innerHTML = '<i class="fa-solid fa-pen text-red-600 mr-1.5"></i> Editar Cita';
+            document.getElementById('btnGuardarProg').innerHTML = '<i class="fa-solid fa-sync"></i> Actualizar Cita';
+            document.getElementById('btnCancelarProg').classList.remove('hidden');
+        }
+
+        function cancelarEdicionProgramacion() {
+            document.getElementById('formProgramacion').reset();
+            document.getElementById('progIdEdit').value = '';
+            setFechaActualInputs();
+            document.getElementById('tituloFormProgramacion').innerHTML = '<i class="fa-solid fa-calendar-plus text-red-600 mr-1.5"></i> Programar Entrega';
+            document.getElementById('btnGuardarProg').innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Registrar Programación';
+            document.getElementById('btnCancelarProg').classList.add('hidden');
+        }
+
+        function eliminarProgramacion(id) {
+            if (confirm('¿Desea eliminar esta cita programada?')) {
+                DB.programacionCompras = DB.programacionCompras.filter(p => p.id !== id);
+                renderTodo();
+            }
+        }
+
+        // CARGA RÁPIDA DE CITA AL FORMULARIO DE RECIBO
+        function cargarCitaARecibo(id) {
+            const cita = DB.programacionCompras.find(p => p.id === id);
+            if (!cita) return;
+            
+            document.getElementById('empresaProveedor').value = cita.proveedor;
+            if (cita.fecha) document.getElementById('fechaFactura').value = cita.fecha;
+            if (cita.turno) document.getElementById('turnoFactura').value = cita.turno;
+            
+            window.scrollTo({ top: document.getElementById('formFactura').offsetTop - 80, behavior: 'smooth' });
+        }
+
+        function renderAgendaCompras() {
+            const tbody = document.getElementById('tablaAgendaCompras');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            const query = (document.getElementById('searchAgenda').value || '').toLowerCase();
+            const filtrados = DB.programacionCompras.filter(p => 
+                p.proveedor.toLowerCase().includes(query) ||
+                (p.vendedor && p.vendedor.toLowerCase().includes(query)) ||
+                p.fecha.includes(query)
+            );
+
+            const countEl = document.getElementById('countAgendaText');
+            if (countEl) countEl.textContent = `${filtrados.length} Citas`;
+
+            if (filtrados.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-3 text-center text-slate-400 font-medium">Sin citas de proveedores programadas.</td></tr>`;
+                return;
+            }
+
+            filtrados.forEach(p => {
+                // VERIFICACIÓN EN CALIENTE: Comprobar si ya existe una factura registrada para este proveedor en esa fecha
+                const fueRecibido = DB.facturas.some(f => 
+                    f.empresaProveedor.toLowerCase().trim() === p.proveedor.toLowerCase().trim() && 
+                    f.fecha === p.fecha
+                );
+
+                const badgeEstado = fueRecibido 
+                    ? `<span class="bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-black px-2.5 py-1 rounded-full uppercase flex items-center justify-center gap-1"><i class="fa-solid fa-circle-check text-emerald-600"></i> RECIBIDA</span>`
+                    : `<span class="bg-amber-100 text-amber-800 border border-amber-300 text-[10px] font-black px-2.5 py-1 rounded-full uppercase flex items-center justify-center gap-1"><i class="fa-solid fa-clock text-amber-600 animate-pulse"></i> PENDIENTE</span>`;
+
+                const tr = document.createElement('tr');
+                tr.className = fueRecibido ? 'bg-emerald-50/50 hover:bg-emerald-100/50 transition border-b border-slate-100' : 'hover:bg-slate-50 transition border-b border-slate-100';
+                tr.innerHTML = `
+                    <td class="p-2.5 text-slate-700">
+                        <div class="font-bold text-red-700">${p.fecha}</div>
+                        <div class="text-[10px] text-slate-500">Hora: ${p.hora || 'N/A'} | ${p.turno || ''}</div>
+                    </td>
+                    <td class="p-2.5 font-black text-slate-900">${p.proveedor}</td>
+                    <td class="p-2.5 text-slate-700">${p.vendedor || 'N/A'}</td>
+                    <td class="p-2.5 text-slate-500 text-[11px]">${p.obs || '-'}</td>
+                    <td class="p-2.5 text-center">${badgeEstado}</td>
+                    <td class="p-2.5 text-center space-x-1">
+                        <button type="button" onclick="cargarCitaARecibo('${p.id}')" title="Cargar a Recibo" class="text-emerald-700 hover:text-emerald-900 px-1"><i class="fa-solid fa-truck-ramp-box"></i></button>
+                        <button type="button" onclick="editarProgramacion('${p.id}')" title="Editar" class="text-slate-700 hover:text-black px-1"><i class="fa-solid fa-pen"></i></button>
+                        <button type="button" onclick="eliminarProgramacion('${p.id}')" title="Eliminar" class="text-red-600 hover:text-red-800 px-1"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // --- MANEJO DE FACTURAS Y DESCARGUES ---
+        function calcularTotalDescargueForm() {
+            const ton = limpiarNumero(document.getElementById('cantTon').value);
+            const tarifaTon = limpiarNumero(document.getElementById('tarifaTon').value);
+            const cajas = limpiarNumero(document.getElementById('cantCajas').value);
+            const tarifaCajas = limpiarNumero(document.getElementById('tarifaCajas').value);
+            const arrobas = limpiarNumero(document.getElementById('cantArrobas').value);
+            const tarifaArrobas = limpiarNumero(document.getElementById('tarifaArrobas').value);
+            const bultos = limpiarNumero(document.getElementById('cantBultos').value);
+            const tarifaBultos = limpiarNumero(document.getElementById('tarifaBultos').value);
+
+            const total = (ton * tarifaTon) + (cajas * tarifaCajas) + (arrobas * tarifaArrobas) + (bultos * tarifaBultos);
+            const txtTotal = document.getElementById('txtTotalDescargueForm');
+            if (txtTotal) txtTotal.textContent = `$${total.toLocaleString('es-CO')}`;
+            return total;
+        }
+
+        function guardarFactura(e) {
+            e.preventDefault();
+            const idEdit = document.getElementById('facturaIdEdit').value;
+            const numFactura = document.getElementById('numFactura').value.trim();
+            const empresaProveedor = document.getElementById('empresaProveedor').value.trim();
+            const fecha = document.getElementById('fechaFactura').value;
+            const turno = document.getElementById('turnoFactura').value.trim();
+
+            const horaLlegada = document.getElementById('horaLlegada').value;
+            const horaInicio = document.getElementById('horaInicio').value;
+            const horaTermino = document.getElementById('horaTermino').value;
+
+            const ton = limpiarNumero(document.getElementById('cantTon').value);
+            const tarifaTon = limpiarNumero(document.getElementById('tarifaTon').value);
+            const cajas = limpiarNumero(document.getElementById('cantCajas').value);
+            const tarifaCajas = limpiarNumero(document.getElementById('tarifaCajas').value);
+            const arrobas = limpiarNumero(document.getElementById('cantArrobas').value);
+            const tarifaArrobas = limpiarNumero(document.getElementById('tarifaArrobas').value);
+            const bultos = limpiarNumero(document.getElementById('cantBultos').value);
+            const tarifaBultos = limpiarNumero(document.getElementById('tarifaBultos').value);
+
+            const totalValor = (ton * tarifaTon) + (cajas * tarifaCajas) + (arrobas * tarifaArrobas) + (bultos * tarifaBultos);
+
+            const objetoFactura = {
+                id: idEdit || Date.now().toString(),
+                numFactura, empresaProveedor, fecha, turno,
+                horaLlegada, horaInicio, horaTermino,
+                ton, tarifaTon, subtotalTon: ton * tarifaTon,
+                cajas, tarifaCajas, subtotalCajas: cajas * tarifaCajas,
+                arrobas, tarifaArrobas, subtotalArrobas: arrobas * tarifaArrobas,
+                bultos, tarifaBultos, subtotalBultos: bultos * tarifaBultos,
+                totalValor
+            };
+
+            if (idEdit) {
+                const idx = DB.facturas.findIndex(f => f.id === idEdit);
+                if (idx !== -1) DB.facturas[idx] = objetoFactura;
+            } else {
+                DB.facturas.unshift(objetoFactura);
+            }
+
+            cancelarEdicionFactura();
+            renderTodo(); // Esto actualizará la agenda en caliente marcándola como RECIBIDA
+        }
+
+        function editarFactura(id) {
+            const fac = DB.facturas.find(f => f.id === id);
+            if (!fac) return;
+
+            document.getElementById('facturaIdEdit').value = fac.id;
+            document.getElementById('numFactura').value = fac.numFactura;
+            document.getElementById('empresaProveedor').value = fac.empresaProveedor;
+            document.getElementById('fechaFactura').value = fac.fecha;
+            document.getElementById('turnoFactura').value = fac.turno;
+            document.getElementById('horaLlegada').value = fac.horaLlegada || '';
+            document.getElementById('horaInicio').value = fac.horaInicio || '';
+            document.getElementById('horaTermino').value = fac.horaTermino || '';
+            document.getElementById('cantTon').value = fac.ton;
+            document.getElementById('tarifaTon').value = fac.tarifaTon;
+            document.getElementById('cantCajas').value = fac.cajas;
+            document.getElementById('tarifaCajas').value = fac.tarifaCajas;
+            document.getElementById('cantArrobas').value = fac.arrobas;
+            document.getElementById('tarifaArrobas').value = fac.tarifaArrobas;
+            document.getElementById('cantBultos').value = fac.bultos;
+            document.getElementById('tarifaBultos').value = fac.tarifaBultos;
+
+            calcularTotalDescargueForm();
+            document.getElementById('tituloFormFactura').innerHTML = '<i class="fa-solid fa-pen text-red-500"></i> Editar Factura de Mercancía';
+            document.getElementById('btnSubmitFactura').innerHTML = '<i class="fa-solid fa-sync"></i> Actualizar Factura';
+            document.getElementById('btnCancelarFactura').classList.remove('hidden');
+
+            window.scrollTo({ top: document.getElementById('formFactura').offsetTop - 80, behavior: 'smooth' });
+        }
+
+        function cancelarEdicionFactura() {
+            document.getElementById('formFactura').reset();
+            document.getElementById('facturaIdEdit').value = '';
+            setFechaActualInputs();
+            calcularTotalDescargueForm();
+            document.getElementById('tituloFormFactura').innerHTML = '<i class="fa-solid fa-truck-ramp-box text-red-500"></i> Registro de Entrada de Mercancía & Factura';
+            document.getElementById('btnSubmitFactura').innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Guardar Factura & Confirmar Recibo';
+            document.getElementById('btnCancelarFactura').classList.add('hidden');
+        }
+
+        function eliminarFactura(id) {
+            if (confirm('¿Desea eliminar esta factura?')) {
+                DB.facturas = DB.facturas.filter(f => f.id !== id);
+                renderTodo();
+            }
+        }
+
+        function renderFacturas() {
+            const tbody = document.getElementById('tablaBodyFacturas');
+            const selectProv = document.getElementById('filtroProveedorIndividual');
+            if (!tbody || !selectProv) return;
+
+            const provSeleccionadoActual = selectProv.value;
+            selectProv.innerHTML = '<option value="todos">-- Todos los Proveedores --</option>';
+
+            const proveedoresUnicos = [...new Set(DB.facturas.map(f => f.empresaProveedor))];
+            proveedoresUnicos.forEach(prov => {
+                const opt = document.createElement('option');
+                opt.value = prov;
+                opt.textContent = prov;
+                selectProv.appendChild(opt);
+            });
+            selectProv.value = provSeleccionadoActual;
+
+            tbody.innerHTML = '';
+
+            let facturasFiltradas = filtrarPorPeriodo(DB.facturas);
+
+            if (selectProv.value !== 'todos') {
+                facturasFiltradas = facturasFiltradas.filter(f => f.empresaProveedor === selectProv.value);
+            }
+
+            const queryBusqueda = (document.getElementById('searchFacturas').value || '').toLowerCase();
+            if (queryBusqueda) {
+                facturasFiltradas = facturasFiltradas.filter(f => 
+                    f.numFactura.toLowerCase().includes(queryBusqueda) ||
+                    f.empresaProveedor.toLowerCase().includes(queryBusqueda)
+                );
+            }
+
+            let totalRecaudadoProv = facturasFiltradas.reduce((acc, f) => acc + f.totalValor, 0);
+            const txtRecaudadoProv = document.getElementById('totalRecaudadoProveedorText');
+            if (txtRecaudadoProv) {
+                txtRecaudadoProv.textContent = `Total: $${totalRecaudadoProv.toLocaleString('es-CO')}`;
+            }
+
+            const totalPaginas = Math.ceil(facturasFiltradas.length / registrosPorPagina) || 1;
+            if (paginaActual > totalPaginas) paginaActual = totalPaginas;
+
+            const inicio = (paginaActual - 1) * registrosPorPagina;
+            const paginados = facturasFiltradas.slice(inicio, inicio + registrosPorPagina);
+
+            const infoPag = document.getElementById('infoPaginacion');
+            if (infoPag) infoPag.textContent = `Página ${paginaActual} de ${totalPaginas}`;
+            
+            const btnPrev = document.getElementById('btnPagPrev');
+            const btnNext = document.getElementById('btnPagNext');
+            if (btnPrev) btnPrev.disabled = paginaActual === 1;
+            if (btnNext) btnNext.disabled = paginaActual === totalPaginas;
+
+            if (paginados.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-slate-400 font-medium">Sin facturas registradas.</td></tr>`;
+                return;
+            }
+
+            paginados.forEach(f => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
+                tr.innerHTML = `
+                    <td class="p-3.5 font-black text-red-700">${f.numFactura}</td>
+                    <td class="p-3.5 font-bold text-slate-900">${f.empresaProveedor}</td>
+                    <td class="p-3.5 text-slate-700">
+                        <div>${f.fecha}</div>
+                        <div class="text-[10px] text-slate-500 font-medium">${f.turno}</div>
+                    </td>
+                    <td class="p-3.5 text-slate-600 text-[11px]">
+                        <div>Llegada: ${f.horaLlegada || '-'}</div>
+                        <div>Inicio: ${f.horaInicio || '-'} | Fin: ${f.horaTermino || '-'}</div>
+                    </td>
+                    <td class="p-3.5 text-slate-800 text-[11px]">
+                        ${f.ton !== 0 ? `<div><b>Ton:</b> ${f.ton}</div>` : ''}
+                        ${f.cajas !== 0 ? `<div><b>Cajas:</b> ${f.cajas}</div>` : ''}
+                        ${f.arrobas !== 0 ? `<div><b>Arrobas:</b> ${f.arrobas}</div>` : ''}
+                        ${f.bultos !== 0 ? `<div><b>Bultos:</b> ${f.bultos}</div>` : ''}
+                    </td>
+                    <td class="p-3.5 text-right font-black text-emerald-700 text-sm">$${f.totalValor.toLocaleString('es-CO')}</td>
+                    <td class="p-3.5 text-center space-x-1">
+                        <button type="button" onclick="editarFactura('${f.id}')" title="Editar" class="text-slate-700 hover:text-black px-1"><i class="fa-solid fa-pen"></i></button>
+                        <button type="button" onclick="eliminarFactura('${f.id}')" title="Eliminar" class="text-red-600 hover:text-red-800 px-1"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function cambiarPagina(delta) {
+            paginaActual += delta;
+            renderFacturas();
+        }
+
+        function setFiltroPeriodo(periodo) {
+            estadoFiltroPeriodo = periodo;
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.className = 'filter-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition';
+            });
+            const btnActivo = document.getElementById(`btnFiltro-${periodo}`);
+            if (btnActivo) btnActivo.className = 'filter-btn px-3 py-1.5 rounded-lg text-xs font-extrabold bg-red-600 text-white transition shadow-sm';
+            paginaActual = 1;
+            renderTodo();
+        }
+
+        function filtrarPorPeriodo(arreglo) {
+            if (estadoFiltroPeriodo === 'todos') return arreglo;
+            const hoy = new Date();
+            return arreglo.filter(item => {
+                if (!item.fecha) return true;
+                const fechaItem = new Date(item.fecha + 'T00:00:00');
+                const diffDias = (hoy - fechaItem) / (1000 * 60 * 60 * 24);
+                if (estadoFiltroPeriodo === 'diario') return diffDias < 1 && hoy.getDate() === fechaItem.getDate();
+                if (estadoFiltroPeriodo === 'semanal') return diffDias <= 7;
+                if (estadoFiltroPeriodo === 'quincenal') return diffDias <= 15;
+                if (estadoFiltroPeriodo === 'mensual') return diffDias <= 30;
+                return true;
+            });
+        }
+
+        function renderIndicadores() {
+            const facturasFiltradas = filtrarPorPeriodo(DB.facturas);
+            const pagosFiltrados = filtrarPorPeriodo(DB.pagosCoteros);
+
+            const totalRecaudado = facturasFiltradas.reduce((acc, f) => acc + f.totalValor, 0);
+            const totalPagado = pagosFiltrados.reduce((acc, p) => acc + p.valor, 0);
+            const utilidad = totalRecaudado - totalPagado;
+
+            const hoyStr = new Date().toISOString().split('T')[0];
+            const facturasHoy = DB.facturas.filter(f => f.fecha === hoyStr);
+            let tonHoy = 0, cajasHoy = 0, arrobasHoy = 0, bultosHoy = 0;
+            facturasHoy.forEach(f => {
+                tonHoy += f.ton || 0;
+                cajasHoy += f.cajas || 0;
+                arrobasHoy += f.arrobas || 0;
+                bultosHoy += f.bultos || 0;
+            });
+
+            const elVolHoy = document.getElementById('cardVolumenHoy');
+            const elDetHoy = document.getElementById('cardCargaDetalleHoy');
+            const elRecaudado = document.getElementById('cardRecaudado');
+            const elPagado = document.getElementById('cardPagadoCoteros');
+            const cardUtilidad = document.getElementById('cardUtilidad');
+
+            if (elVolHoy) elVolHoy.textContent = `${tonHoy} Ton | ${cajasHoy} Cajas`;
+            if (elDetHoy) elDetHoy.textContent = `${arrobasHoy} @ | ${bultosHoy} Bultos recibidos hoy`;
+            if (elRecaudado) elRecaudado.textContent = `$${totalRecaudado.toLocaleString('es-CO')}`;
+            if (elPagado) elPagado.textContent = `$${totalPagado.toLocaleString('es-CO')}`;
+            
+            if (cardUtilidad) {
+                cardUtilidad.textContent = `$${utilidad.toLocaleString('es-CO')}`;
+            }
+        }
+
+        // --- GESTIÓN DE COTEROS (DESCARGADORES) ---
+        function guardarDescargador(e) {
+            e.preventDefault();
+            const idEdit = document.getElementById('coteroIdEdit').value;
+            const nombre = document.getElementById('coteroNombre').value.trim();
+            const cedula = document.getElementById('coteroCedula').value.trim();
+            const telefono = document.getElementById('coteroTelefono').value.trim();
+
+            if (!nombre) return;
+
+            if (idEdit) {
+                const index = DB.coteros.findIndex(c => c.id === idEdit);
+                if (index !== -1) DB.coteros[index] = { id: idEdit, nombre, cedula, telefono };
+            } else {
+                DB.coteros.push({ id: Date.now().toString(), nombre, cedula, telefono });
+            }
+
+            cancelarEdicionCotero();
+            renderTodo();
+        }
+
+        function editarCotero(id) {
+            const cotero = DB.coteros.find(c => c.id === id);
+            if (!cotero) return;
+            document.getElementById('coteroIdEdit').value = cotero.id;
+            document.getElementById('coteroNombre').value = cotero.nombre;
+            document.getElementById('coteroCedula').value = cotero.cedula || '';
+            document.getElementById('coteroTelefono').value = cotero.telefono || '';
+
+            document.getElementById('tituloFormCotero').innerHTML = '<i class="fa-solid fa-pen text-red-600 mr-1.5"></i> Editar Cotero';
+            document.getElementById('btnGuardarCotero').innerHTML = '<i class="fa-solid fa-sync"></i> Actualizar Personal';
+            document.getElementById('btnCancelarCotero').classList.remove('hidden');
+        }
+
+        function cancelarEdicionCotero() {
+            document.getElementById('formCotero').reset();
+            document.getElementById('coteroIdEdit').value = '';
+            document.getElementById('tituloFormCotero').innerHTML = '<i class="fa-solid fa-user-plus text-red-600 mr-1.5"></i> Registrar Descargador';
+            document.getElementById('btnGuardarCotero').innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Registrar Personal';
+            document.getElementById('btnCancelarCotero').classList.add('hidden');
+        }
+
+        function eliminarCotero(id) {
+            if (confirm('¿Desea eliminar este cotero?')) {
+                DB.coteros = DB.coteros.filter(c => c.id !== id);
+                renderTodo();
+            }
+        }
+
+        function renderCoteros() {
+            const tbody = document.getElementById('tablaListaCoteros');
+            const selectPago = document.getElementById('selectPagoCotero');
+            const selectReporte = document.getElementById('filtroCoteroIndividual');
+            if (!tbody || !selectPago || !selectReporte) return;
+            
+            const valorSelectActual = selectReporte.value;
+            tbody.innerHTML = '';
+            selectPago.innerHTML = '<option value="">-- Seleccionar --</option>';
+            selectReporte.innerHTML = '<option value="todos">-- Todos los Coteros --</option>';
+
+            const queryLupa = (document.getElementById('searchCoterosList').value || '').toLowerCase();
+            const coterosFiltrados = DB.coteros.filter(c => 
+                c.nombre.toLowerCase().includes(queryLupa) || 
+                (c.cedula && c.cedula.toLowerCase().includes(queryLupa))
+            );
+
+            if (coterosFiltrados.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" class="p-3 text-center text-slate-400">Sin personal.</td></tr>`;
+            } else {
+                coterosFiltrados.forEach(c => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-slate-50 transition';
+                    tr.innerHTML = `
+                        <td class="p-2 font-bold text-slate-900">${c.nombre}</td>
+                        <td class="p-2 text-slate-500">${c.cedula || '-'}</td>
+                        <td class="p-2 text-right space-x-1">
+                            <button type="button" onclick="editarCotero('${c.id}')" title="Editar" class="text-slate-700 hover:text-black px-1"><i class="fa-solid fa-pen"></i></button>
+                            <button type="button" onclick="eliminarCotero('${c.id}')" title="Eliminar" class="text-red-600 hover:text-red-800 px-1"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            DB.coteros.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.id;
+                opt.textContent = `${c.nombre} ${c.cedula ? '('+c.cedula+')' : ''}`;
+                selectPago.appendChild(opt);
+
+                const optRep = document.createElement('option');
+                optRep.value = c.id;
+                optRep.textContent = `${c.nombre} ${c.cedula ? '('+c.cedula+')' : ''}`;
+                selectReporte.appendChild(optRep);
+            });
+
+            selectReporte.value = valorSelectActual;
+        }
+
+        function procesarPagoCotero(e) {
+            e.preventDefault();
+            const coteroId = document.getElementById('selectPagoCotero').value;
+            const valor = limpiarNumero(document.getElementById('montoPagoCotero').value);
+            const fecha = document.getElementById('fechaPagoCotero').value;
+            const concepto = document.getElementById('conceptoPagoCotero').value.trim() || 'Pago por descargue de mercancía';
+
+            if (!coteroId || valor <= 0) return;
+            const cotero = DB.coteros.find(c => c.id === coteroId);
+            if (!cotero) return;
+
+            const nuevoPago = {
+                id: Date.now().toString(),
+                coteroId,
+                coteroNombre: cotero.nombre,
+                coteroCedula: cotero.cedula || 'N/A',
+                valor,
+                fecha,
+                concepto
+            };
+
+            DB.pagosCoteros.push(nuevoPago);
+            document.getElementById('formPagoCotero').reset();
+            setFechaActualInputs();
+            renderTodo();
+        }
+
+        function eliminarPagoCotero(id) {
+            if (confirm('¿Desea anular este pago?')) {
+                DB.pagosCoteros = DB.pagosCoteros.filter(p => p.id !== id);
+                renderTodo();
+            }
+        }
+
+        function renderPagosCoteros() {
+            const tbody = document.getElementById('tablaHistorialPagosCoteros');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+            
+            let totalPagado = 0;
+            const selectCoteroInd = document.getElementById('filtroCoteroIndividual').value;
+
+            let pagosFiltrados = filtrarPorPeriodo(DB.pagosCoteros);
+
+            if (selectCoteroInd !== 'todos') {
+                pagosFiltrados = pagosFiltrados.filter(p => p.coteroId === selectCoteroInd);
+            }
+
+            pagosFiltrados.forEach(p => {
+                totalPagado += p.valor;
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 transition';
+                tr.innerHTML = `
+                    <td class="p-2 text-slate-500">${p.fecha}</td>
+                    <td class="p-2 font-bold text-slate-900">${p.coteroNombre}</td>
+                    <td class="p-2 text-slate-600">${p.concepto}</td>
+                    <td class="p-2 text-right font-black text-slate-900">$${p.valor.toLocaleString('es-CO')}</td>
+                    <td class="p-2 text-center">
+                        <button type="button" onclick="eliminarPagoCotero('${p.id}')" title="Eliminar" class="text-red-600 hover:text-red-800 px-1"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            const txtPagado = document.getElementById('totalPagadoCoterosText');
+            if (txtPagado) {
+                txtPagado.textContent = `Total: $${totalPagado.toLocaleString('es-CO')}`;
+            }
+        }
+
+        // --- IMPRESIÓN DE INFORMES EJECUTIVOS PDF (A4) ---
+        function imprimirInformeAgendaComprasPDF() {
+            const printArea = document.getElementById('printArea');
+            if (!printArea) return;
+
+            let htmlFilas = '';
+            DB.programacionCompras.forEach((p, index) => {
+                const fueRecibido = DB.facturas.some(f => 
+                    f.empresaProveedor.toLowerCase().trim() === p.proveedor.toLowerCase().trim() && 
+                    f.fecha === p.fecha
+                );
+                const txtEstado = fueRecibido ? 'MERCANCÍA RECIBIDA' : 'PENDIENTE';
+
+                htmlFilas += `
+                    <tr style="border-bottom: 1px solid #e2e8f0;">
+                        <td style="padding: 8px; font-weight: bold;">${index + 1}</td>
+                        <td style="padding: 8px;">${p.fecha} ${p.hora ? '('+p.hora+')' : ''}</td>
+                        <td style="padding: 8px; font-weight: bold; color: #b91c1c;">${p.proveedor}</td>
+                        <td style="padding: 8px;">${p.vendedor || 'N/A'}</td>
+                        <td style="padding: 8px;">${p.obs || '-'}</td>
+                        <td style="padding: 8px; font-weight: bold; color: ${fueRecibido ? '#059669' : '#d97706'};">${txtEstado}</td>
+                    </tr>
+                `;
+            });
+
+            printArea.innerHTML = `
+                <div style="font-family: 'Plus Jakarta Sans', sans-serif; color: #0f172a; padding: 10mm;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #dc2626; padding-bottom: 12px; margin-bottom: 20px;">
+                        <div>
+                            <h1 style="font-size: 20px; font-weight: 900; color: #0f172a; margin: 0;">SUPERMERCADOS DINASTÍA</h1>
+                            <p style="font-size: 12px; font-weight: 700; color: #dc2626; margin: 2px 0 0 0;">INFORME EJECUTIVO DE PROGRAMACIÓN DE COMPRAS & ENTREGAS</p>
+                        </div>
+                        <div style="text-align: right; font-size: 11px; color: #475569;">
+                            <p style="margin: 0;"><b>Fecha de Emisión:</b> ${new Date().toLocaleDateString('es-CO')} ${new Date().toLocaleTimeString('es-CO')}</p>
+                            <p style="margin: 0;"><b>Responsable:</b> Walter Meza Trujillano (Seguridad)</p>
+                        </div>
+                    </div>
+
+                    <table style="width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 30px;">
+                        <thead>
+                            <tr style="background-color: #0f172a; color: #ffffff; font-weight: 800; text-align: left;">
+                                <th style="padding: 8px;">#</th>
+                                <th style="padding: 8px;">Fecha / Hora</th>
+                                <th style="padding: 8px;">Proveedor</th>
+                                <th style="padding: 8px;">Vendedor</th>
+                                <th style="padding: 8px;">Observaciones</th>
+                                <th style="padding: 8px;">Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${htmlFilas || '<tr><td colspan="6" style="padding: 12px; text-align: center;">Sin registros en agenda.</td></tr>'}
+                        </tbody>
+                    </table>
+
+                    <div style="margin-top: 60px; display: flex; justify-content: space-between; font-size: 11px;">
+                        <div style="border-top: 1px solid #000; width: 30%; text-align: center; padding-top: 5px; font-weight: bold;">
+                            Firma Área de Compras
+                        </div>
+                        <div style="border-top: 1px solid #000; width: 30%; text-align: center; padding-top: 5px; font-weight: bold;">
+                            Firma Recibo de Mercancía
+                        </div>
+                        <div style="border-top: 1px solid #000; width: 30%; text-align: center; padding-top: 5px; font-weight: bold;">
+                            Firma Jefatura de Seguridad
+                        </div>
+                    </div>
+                </div>
+            `;
+            window.print();
+        }
+
+        function imprimirInformeEjecutivoProveedorPDF() {
+            const selectProvInd = document.getElementById('filtroProveedorIndividual').value;
+            if (selectProvInd === 'todos') {
+                alert('Por favor seleccione un proveedor específico en el menú desplegable.');
+                return;
+            }
+
+            let facturasFiltradas = filtrarPorPeriodo(DB.facturas).filter(f => f.empresaProveedor === selectProvInd);
+            let totalAcumuladoProv = facturasFiltradas.reduce((acc, f) => acc + f.totalValor, 0);
+
+            const printArea = document.getElementById('printArea');
+            if (!printArea) return;
+
+            let htmlFilas = '';
+            facturasFiltradas.forEach((f, idx) => {
+                htmlFilas += `
+                    <tr style="border-bottom: 1px solid #e2e8f0;">
+                        <td style="padding: 8px; font-weight: bold;">${idx + 1}</td>
+                        <td style="padding: 8px;">${f.fecha}</td>
+                        <td style="padding: 8px; font-weight: bold; color: #b91c1c;">${f.numFactura}</td>
+                        <td style="padding: 8px;">${f.turno}</td>
+                        <td style="padding: 8px;">${f.ton} Ton | ${f.cajas} Cajas | ${f.arrobas} @ | ${f.bultos} Bultos</td>
+                        <td style="padding: 8px; text-align: right; font-weight: bold;">$${f.totalValor.toLocaleString('es-CO')}</td>
+                    </tr>
+                `;
+            });
+
+            printArea.innerHTML = `
+                <div style="font-family: 'Plus Jakarta Sans', sans-serif; color: #0f172a; padding: 10mm;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #dc2626; padding-bottom: 12px; margin-bottom: 20px;">
+                        <div>
+                            <h1 style="font-size: 20px; font-weight: 900; color: #0f172a; margin: 0;">SUPERMERCADOS DINASTÍA</h1>
+                            <p style="font-size: 12px; font-weight: 700; color: #dc2626; margin: 2px 0 0 0;">INFORME EJECUTIVO DE SEGUIMIENTO A PROVEEDOR</p>
+                        </div>
+                        <div style="text-align: right; font-size: 11px; color: #475569;">
+                            <p style="margin: 0;"><b>Emisión:</b> ${new Date().toLocaleDateString('es-CO')}</p>
+                            <p style="margin: 0;"><b>Período:</b> ${estadoFiltroPeriodo.toUpperCase()}</p>
+                        </div>
+                    </div>
+
+                    <div style="background-color: #f8fafc; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 20px; font-size: 12px;">
+                        <p style="margin: 0;"><b>EMPRESA PROVEEDORA:</b> <span style="color: #b91c1c; font-weight: 800;">${selectProvInd}</span></p>
+                        <p style="margin: 4px 0 0 0;"><b>TOTAL ACUMULADO DESCARGUE EN EL PERÍODO:</b> <span style="font-weight: 900; color: #047857;">$${totalAcumuladoProv.toLocaleString('es-CO')}</span></p>
+                    </div>
+
+                    <table style="width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 30px;">
+                        <thead>
+                            <tr style="background-color: #0f172a; color: #ffffff; font-weight: 800; text-align: left;">
+                                <th style="padding: 8px;">#</th>
+                                <th style="padding: 8px;">Fecha</th>
+                                <th style="padding: 8px;">Factura #</th>
+                                <th style="padding: 8px;">Turno</th>
+                                <th style="padding: 8px;">Mercancía Recibida</th>
+                                <th style="padding: 8px; text-align: right;">Valor Cobrado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${htmlFilas || '<tr><td colspan="6" style="padding: 12px; text-align: center;">Sin entregas registradas.</td></tr>'}
+                        </tbody>
+                    </table>
+
+                    <div style="margin-top: 60px; display: flex; justify-content: space-around; font-size: 11px;">
+                        <div style="border-top: 1px solid #000; width: 35%; text-align: center; padding-top: 5px; font-weight: bold;">
+                            Auditoría de Recibo
+                        </div>
+                        <div style="border-top: 1px solid #000; width: 35%; text-align: center; padding-top: 5px; font-weight: bold;">
+                            Jefatura de Seguridad / WMZ
+                        </div>
+                    </div>
+                </div>
+            `;
+            window.print();
+        }
+
+        function imprimirInformeEjecutivoCoteroPDF() {
+            const selectCoteroInd = document.getElementById('filtroCoteroIndividual').value;
+            if (selectCoteroInd === 'todos') {
+                alert('Por favor seleccione un cotero específico.');
+                return;
+            }
+
+            const cotero = DB.coteros.find(c => c.id === selectCoteroInd);
+            if (!cotero) return;
+
+            let pagosFiltrados = filtrarPorPeriodo(DB.pagosCoteros).filter(p => p.coteroId === selectCoteroInd);
+            let totalAcumulado = pagosFiltrados.reduce((acc, p) => acc + p.valor, 0);
+
+            const printArea = document.getElementById('printArea');
+            if (!printArea) return;
+
+            let htmlFilas = '';
+            pagosFiltrados.forEach((p, idx) => {
+                htmlFilas += `
+                    <tr style="border-bottom: 1px solid #e2e8f0;">
+                        <td style="padding: 8px; font-weight: bold;">${idx + 1}</td>
+                        <td style="padding: 8px;">${p.fecha}</td>
+                        <td style="padding: 8px;">${p.concepto}</td>
+                        <td style="padding: 8px; text-align: right; font-weight: bold;">$${p.valor.toLocaleString('es-CO')}</td>
+                    </tr>
+                `;
+            });
+
+            printArea.innerHTML = `
+                <div style="font-family: 'Plus Jakarta Sans', sans-serif; color: #0f172a; padding: 10mm;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #dc2626; padding-bottom: 12px; margin-bottom: 20px;">
+                        <div>
+                            <h1 style="font-size: 20px; font-weight: 900; color: #0f172a; margin: 0;">SUPERMERCADOS DINASTÍA</h1>
+                            <p style="font-size: 12px; font-weight: 700; color: #dc2626; margin: 2px 0 0 0;">INFORME DE PAGOS A DESCARGADOR / COTERO</p>
+                        </div>
+                        <div style="text-align: right; font-size: 11px; color: #475569;">
+                            <p style="margin: 0;"><b>Emisión:</b> ${new Date().toLocaleDateString('es-CO')}</p>
+                            <p style="margin: 0;"><b>Período:</b> ${estadoFiltroPeriodo.toUpperCase()}</p>
+                        </div>
+                    </div>
+
+                    <div style="background-color: #f8fafc; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 20px; font-size: 12px;">
+                        <p style="margin: 0;"><b>COLABORADOR:</b> <span style="font-weight: 800;">${cotero.nombre}</span> | <b>CÉDULA:</b> ${cotero.cedula || 'N/A'}</p>
+                        <p style="margin: 4px 0 0 0;"><b>TOTAL LIQUIDADO EN EL PERÍODO:</b> <span style="font-weight: 900; color: #b91c1c;">$${totalAcumulado.toLocaleString('es-CO')}</span></p>
+                    </div>
+
+                    <table style="width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 30px;">
+                        <thead>
+                            <tr style="background-color: #0f172a; color: #ffffff; font-weight: 800; text-align: left;">
+                                <th style="padding: 8px;">#</th>
+                                <th style="padding: 8px;">Fecha</th>
+                                <th style="padding: 8px;">Concepto</th>
+                                <th style="padding: 8px; text-align: right;">Monto Pagado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${htmlFilas || '<tr><td colspan="4" style="padding: 12px; text-align: center;">Sin pagos en este período.</td></tr>'}
+                        </tbody>
+                    </table>
+
+                    <div style="margin-top: 60px; display: flex; justify-content: space-around; font-size: 11px;">
+                        <div style="border-top: 1px solid #000; width: 35%; text-align: center; padding-top: 5px; font-weight: bold;">
+                            Firma del Colaborador
+                        </div>
+                        <div style="border-top: 1px solid #000; width: 35%; text-align: center; padding-top: 5px; font-weight: bold;">
+                            Jefatura de Seguridad / WMZ
+                        </div>
+                    </div>
+                </div>
+            `;
+            window.print();
+        }
+
+        // --- BACKUP Y EXPORTACIÓN CSV ---
+        function exportarBackupJSON() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(DB, null, 2));
+            const a = document.createElement('a');
+            a.setAttribute("href", dataStr);
+            a.setAttribute("download", `WMZ_Enterprise_Backup_${new Date().toISOString().split('T')[0]}.json`);
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        }
+
+        function importarBackupJSON(event) {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                try {
+                    const parsed = JSON.parse(e.target.result);
+                    if (parsed.facturas && parsed.coteros && parsed.pagosCoteros) {
+                        DB = parsed;
+                        renderTodo();
+                        alert('¡Respaldo restaurado con éxito!');
+                    } else {
+                        alert('Estructura de archivo inválida.');
+                    }
+                } catch (err) {
+                    alert('Error al leer el archivo JSON.');
+                }
+            };
+            reader.readAsText(event.target.files[0]);
+        }
+
+        function exportarExcelCSV() {
+            if (DB.facturas.length === 0) {
+                alert('No hay registros para exportar.');
+                return;
+            }
+            let csv = "data:text/csv;charset=utf-8,Factura,Proveedor,Fecha,Turno,Llegada,Inicio,Termino,Ton,TarifaTon,Cajas,TarifaCajas,Arrobas,TarifaArrobas,Bultos,TarifaBultos,Total\n";
+            DB.facturas.forEach(f => {
+                csv += `"${f.numFactura}","${f.empresaProveedor}","${f.fecha}","${f.turno}","${f.horaLlegada || ''}","${f.horaInicio || ''}","${f.horaTermino || ''}",${f.ton},${f.tarifaTon},${f.cajas},${f.tarifaCajas},${f.arrobas},${f.tarifaArrobas},${f.bultos},${f.tarifaBultos},${f.totalValor}\n`;
+            });
+            const link = document.createElement("a");
+            link.setAttribute("href", encodeURI(csv));
+            link.setAttribute("download", `Reporte_Dinastia_WMZ_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        }
+    </script>
+</body>
+</html>
